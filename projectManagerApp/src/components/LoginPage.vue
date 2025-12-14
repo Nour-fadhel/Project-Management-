@@ -92,6 +92,7 @@
 
           <!-- Bouton de connexion -->
           <button
+              @click="handleLogin"
               type="submit"
               :disabled="loading"
               class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -152,32 +153,115 @@
   </div>
 </template>
 
-<script setup>
-import { ref } from 'vue'
 
-const loading = ref(false)
-const showPassword = ref(false)
+
+<script setup>
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+const loading = ref(false);
+const showPassword = ref(false);
 
 const loginForm = ref({
-  email: '',
-  password: '',
+  email: "",
+  password: "",
   rememberMe: false
-})
+});
 
 const togglePasswordVisibility = () => {
-  showPassword.value = !showPassword.value
-  const passwordInput = document.getElementById('password')
-  if (passwordInput) {
-    passwordInput.type = showPassword.value ? 'text' : 'password'
-  }
-}
+  showPassword.value = !showPassword.value;
+};
 
+// Complete handleLogin method with debugging for LoginPage.vue
 const handleLogin = async () => {
-  loading.value = true
-  // Simulation de connexion
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  loading.value = false
-  // Redirection vers le dashboard
-  console.log('Connexion réussie')
-}
+  loading.value = true;
+  try {
+    console.log("🔐 Attempting login...");
+
+    const res = await fetch("http://127.0.0.1:5000/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email: loginForm.value.email,
+        password: loginForm.value.password
+      })
+    });
+
+    console.log("📡 Response status:", res.status);
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (jsonErr) {
+      console.error("❌ Failed to parse JSON:", jsonErr);
+      loading.value = false;
+      alert("Invalid server response");
+      return;
+    }
+
+    console.log("📦 Response data:", data);
+
+    loading.value = false;
+
+    if (!res.ok) {
+      alert(data.message || "Échec de connexion");
+      return;
+    }
+
+    // ✅ CRITICAL: Check if token exists in response
+    if (!data.token) {
+      console.error("❌ No token in response!");
+      alert("Server did not return authentication token");
+      return;
+    }
+
+    console.log("🎫 Token received:", data.token.substring(0, 50) + "...");
+    console.log("🎫 Token length:", data.token.length);
+
+    // ✅ Verify token has 3 parts (header.payload.signature)
+    const tokenParts = data.token.split('.');
+    console.log("🎫 Token parts:", tokenParts.length, "(should be 3)");
+
+    if (tokenParts.length !== 3) {
+      console.error("❌ Invalid JWT format! Token has", tokenParts.length, "parts instead of 3");
+      alert("Invalid authentication token format");
+      return;
+    }
+
+    const userRole = data.user.role;
+
+    // ✅ Store with consistent key "jwt_token"
+    localStorage.setItem("jwt_token", data.token);
+    localStorage.setItem("token", data.token); // Store both for compatibility
+    localStorage.setItem("role", userRole);
+    localStorage.setItem("user", JSON.stringify(data.user));
+    localStorage.setItem("user_id", data.user.id);
+
+    console.log("✅ Token stored successfully!");
+    console.log("✅ Stored role:", userRole);
+    console.log("✅ Stored user:", data.user);
+
+    // Verify storage
+    console.log("🔍 Verification - token in storage:", localStorage.getItem("jwt_token") ? "YES" : "NO");
+
+    // ✅ Redirect based on role
+    if (userRole === "admin") {
+      console.log("➡️ Redirecting to AdminDashboard");
+      router.push("/AdminDashboard");
+    } else if (userRole === "member") {
+      console.log("➡️ Redirecting to MemberDashboard");
+      router.push("/MemberDashboard");
+    } else {
+      console.log("⚠️ Unknown role, redirecting to home");
+      router.push("/");
+    }
+  } catch (error) {
+    loading.value = false;
+    console.error("❌ Login fetch error:", error);
+    alert("Erreur serveur : " + error.message);
+  }
+};
 </script>

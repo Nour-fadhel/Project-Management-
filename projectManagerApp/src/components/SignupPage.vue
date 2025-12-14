@@ -225,35 +225,54 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
 
-const loading = ref(false)
-const showPassword = ref(false)
-const showConfirmPassword = ref(false)
+const router = useRouter();
 
 const signupForm = ref({
-  fullName: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  acceptedTerms: false,
-  newsletter: false
-})
+  fullName: "",
+  email: "",
+  password: "",
+  confirmPassword: ""
+});
 
-const togglePasswordVisibility = () => {
-  showPassword.value = !showPassword.value
-}
-
-const toggleConfirmPasswordVisibility = () => {
-  showConfirmPassword.value = !showConfirmPassword.value
-}
-
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 const handleSignup = async () => {
-  loading.value = true
-  // Simulation d'inscription
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  loading.value = false
-  // Redirection vers la page de confirmation
-  console.log('Inscription réussie')
-}
+  if (signupForm.value.password !== signupForm.value.confirmPassword) {
+    alert("Les mots de passe ne correspondent pas.");
+    return;
+  }
+
+  const payload = {
+    name: signupForm.value.fullName,
+    email: signupForm.value.email,
+    password: signupForm.value.password
+  };
+
+  try {
+    const res = await fetch("http://127.0.0.1:5000/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message || "Erreur lors de l'inscription.");
+      return;
+    }
+
+    alert("Compte créé avec succès !");
+    router.push("/LoginPage");
+
+  } catch (err) {
+    alert("Erreur serveur : " + err.message);
+  }
+};
+
+
+
 </script>
